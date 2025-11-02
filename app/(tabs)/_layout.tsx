@@ -1,35 +1,79 @@
-import { Tabs } from 'expo-router';
+import CustomDrawerContent from '@/components/CustomDrawerContent';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { Drawer } from 'expo-router/drawer';
 import React from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { user } = useAuth();
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+    <ProtectedRoute>
+      <Drawer
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenOptions={{
+          drawerActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+          drawerHideStatusBarOnOpen: true,
+          drawerStyle: {
+            backgroundColor: colorScheme === 'dark' ? '#000' : '#fff',
+          },
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: colorScheme === 'dark' ? '#0E0E0E' : '#fff', // Match the home screen background
+          },
+          headerTintColor: colorScheme === 'dark' ? '#fff' : '#000',
+          drawerType: 'slide',
+        }}>
+        <Drawer.Screen
+          name="home"
+          options={{
+            title: 'Home',
+            drawerIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          }}
+        />
+        <Drawer.Screen
+          name="explore"
+          options={{
+            title: 'Explore',
+            drawerIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          }}
+        />
+        {user?.email === 'admin@gmail.com' && (
+          <Drawer.Screen
+            name="admin"
+            options={{
+              title: 'Admin',
+              drawerIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
+            }}
+          />
+        )}
+        <Drawer.Screen
+          name="profile"
+          options={{
+            title: 'Meu Perfil',
+            drawerIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          }}
+        />
+        <Drawer.Screen
+          name="immersive"
+          options={{
+            title: 'Experiências Imersivas',
+            drawerIcon: ({ color }) => <IconSymbol size={28} name="sparkles" color={color} />,
+          }}
+        />
+        <Drawer.Screen
+          name="scheduler"
+          options={{
+            title: 'Agenda',
+            drawerIcon: ({ color }) => <IconSymbol size={28} name="alarm.fill" color={color} />,
+          }}
+        />
+      </Drawer>
+    </ProtectedRoute>
   );
 }

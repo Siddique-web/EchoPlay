@@ -3,5 +3,13 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "http.proxy": "",
+  "http.proxyStrictSSL": false,
+  "json.schemas": [],
+  "json.schemaDownload.enable": false,
+  "files.associations": {
+    "*.json": "jsonc"
+  },
+  "json.format.enable": true
 }
