@@ -4,7 +4,7 @@ import { useMusic } from '@/contexts/MusicContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
-import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { FlatList, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -25,6 +25,7 @@ export default function HomeScreen() {
   const { 
     currentMusic, 
     isPlaying, 
+    setCurrentMusic,
     setIsPlaying, 
     sendPlaybackCommand 
   } = useMusic();
@@ -111,18 +112,35 @@ export default function HomeScreen() {
     <TouchableOpacity 
       style={styles.musicItem}
       onPress={() => {
-        // Navigate to music player screen
-        router.push({
-          pathname: '/(tabs)/music-player',
-          params: { music: JSON.stringify(item) }
-        });
+        // If this is the same song that's currently playing, toggle playback
+        if (currentMusic && currentMusic.id === item.id) {
+          togglePlayback();
+        } else {
+          // If a different song is playing, stop it and play the new one
+          if (currentMusic) {
+            sendPlaybackCommand('stop');
+          }
+          
+          // Set the new song as current and start playing
+          setCurrentMusic(item);
+          setIsPlaying(true);
+          sendPlaybackCommand('play');
+        }
       }}
     >
       <View style={styles.musicInfo}>
         <Text style={styles.musicTitle}>{item.title}</Text>
         {item.artist && <Text style={styles.musicArtist}>{item.artist}</Text>}
       </View>
-      <Ionicons name="play" size={20} color="#0a84ff" />
+      {currentMusic && currentMusic.id === item.id ? (
+        <Ionicons 
+          name={isPlaying ? "pause" : "play"} 
+          size={20} 
+          color={isPlaying ? "#0a84ff" : "#0a84ff"} 
+        />
+      ) : (
+        <Ionicons name="play" size={20} color="#0a84ff" />
+      )}
     </TouchableOpacity>
   );
 
@@ -176,6 +194,24 @@ export default function HomeScreen() {
     sendPlaybackCommand('toggle');
   };
 
+  // Skip to next track
+  const skipForward = () => {
+    if (!currentMusic) return;
+    
+    // Send skip forward command to music player
+    // For now, we'll just toggle playback as a placeholder
+    sendPlaybackCommand('toggle');
+  };
+
+  // Skip to previous track
+  const skipBackward = () => {
+    if (!currentMusic) return;
+    
+    // Send skip backward command to music player
+    // For now, we'll just toggle playback as a placeholder
+    sendPlaybackCommand('toggle');
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: "#0E0E0E" }]}>
       {/* 🔵 HEADER */}
@@ -214,7 +250,7 @@ export default function HomeScreen() {
           <View style={styles.leftHeader}>
             <TouchableOpacity 
               style={styles.menuButton}
-              onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+              onPress={() => router.push('/(tabs)/admin')}
             >
               <IconSymbol name="line.3.horizontal" size={24} color="#FFD700" />
             </TouchableOpacity>
@@ -224,24 +260,7 @@ export default function HomeScreen() {
         
         {!isSearching && (
           <View style={styles.headerIcons}>
-            {/* Profile Icon */}
-            <TouchableOpacity 
-              onPress={() => router.push('/(tabs)/profile')}
-              style={styles.profileIcon}
-            >
-              {user?.profile_image ? (
-                <Image 
-                  source={{ uri: user.profile_image }} 
-                  style={styles.profileImageSmall} 
-                />
-              ) : (
-                <View style={styles.profileImagePlaceholderSmall}>
-                  <IconSymbol size={20} name="person.fill" color="#FFD700" />
-                </View>
-              )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity onPress={() => router.push('/(tab)/folders')}>
+            <TouchableOpacity onPress={() => setShowFolderOptions(true)}>
               <Ionicons name="add" size={22} color="#FFD700" style={styles.icon} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setIsSearching(true)}>
@@ -269,7 +288,8 @@ export default function HomeScreen() {
               style={[styles.folderOption, { backgroundColor: '#0a84ff' }]}
               onPress={() => {
                 setShowFolderOptions(false);
-                router.push('/(tab)/folders');
+                // TODO: Implement music folder creation
+                alert('Funcionalidade de criação de pasta de música será implementada');
               }}
             >
               <Ionicons name="musical-notes" size={24} color="#fff" />
@@ -280,7 +300,8 @@ export default function HomeScreen() {
               style={[styles.folderOption, { backgroundColor: '#4CAF50' }]}
               onPress={() => {
                 setShowFolderOptions(false);
-                router.push('/(tab)/folders');
+                // TODO: Implement video folder creation
+                alert('Funcionalidade de criação de pasta de vídeos será implementada');
               }}
             >
               <Ionicons name="videocam" size={24} color="#fff" />
@@ -386,11 +407,15 @@ export default function HomeScreen() {
               <Text style={styles.nowArtist} numberOfLines={1}>By: {currentMusic.artist}</Text>
             </View>
             <View style={styles.nowControls}>
-              <Ionicons name="play-skip-back" size={20} color="#fff" />
+              <TouchableOpacity onPress={skipBackward}>
+                <Ionicons name="play-skip-back" size={20} color="#fff" />
+              </TouchableOpacity>
               <TouchableOpacity onPress={togglePlayback}>
                 <Ionicons name={isPlaying ? "pause" : "play"} size={24} color="#fff" />
               </TouchableOpacity>
-              <Ionicons name="play-skip-forward" size={20} color="#fff" />
+              <TouchableOpacity onPress={skipForward}>
+                <Ionicons name="play-skip-forward" size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
           </>
         ) : (
@@ -445,22 +470,6 @@ const styles = StyleSheet.create({
   },
   headerIcons: { 
     flexDirection: "row" 
-  },
-  profileIcon: {
-    marginRight: 15,
-  },
-  profileImageSmall: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-  },
-  profileImagePlaceholderSmall: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   icon: { 
     marginLeft: 15 
@@ -632,28 +641,33 @@ const styles = StyleSheet.create({
 
   // 🟠 NOW PLAYING
   nowPlaying: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#6C0AAB",
-    padding: 10,
-    position: "absolute",
+    position: 'absolute',
     bottom: 0,
-    width: "100%",
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
   },
-  nowTitle: { 
-    color: "#fff", 
-    fontWeight: "bold",
-    maxWidth: 200,
+  nowTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
   },
-  nowArtist: { 
-    color: "#ccc", 
+  nowArtist: {
+    color: '#aaa',
     fontSize: 12,
-    maxWidth: 200,
   },
-  nowControls: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    gap: 15 
+  nowControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
   },
+  
 });

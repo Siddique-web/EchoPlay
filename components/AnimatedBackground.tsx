@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Montserrat_400Regular, Montserrat_500Medium, Montserrat_700Bold, useFonts } from "@expo-google-fonts/montserrat";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from "expo-haptics";
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
@@ -279,11 +280,15 @@ export default function HomeScreen({ onNavigateToSignUp }: { onNavigateToSignUp?
       console.log('Attempting login with credentials:', { email, password: '***' });
       await login(email, password);
       console.log('Login completed successfully');
+      
+      // Store credentials for biometric authentication
+      await storeBiometricCredentials(email, password);
+      
       setBtnState("success");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Navigate to tabs screen after successful login
       setTimeout(() => {
-        router.push('/(tabs)/home');
+        router.push('/(tab)/home');
       }, 1000);
     } catch (error: any) {
       console.error('Login failed with error:', error);
@@ -314,27 +319,45 @@ export default function HomeScreen({ onNavigateToSignUp }: { onNavigateToSignUp?
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: `Authenticate with ${biometricType || 'biometrics'}`,
-        fallbackLabel: 'Use Passcode',
-        disableDeviceFallback: true,
-      });
+      // Check if we have stored credentials for this user
+      const storedCredentials = await AsyncStorage.getItem('biometricCredentials');
       
-      if (result.success) {
-        // For demo purposes, we'll use the default admin credentials
-        // In a real app, you would retrieve the stored credentials or token
-        await login('admin@gmail.com', 'Luc14c4$tr0');
-        setBiometricBtnState("success");
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Navigate to tabs screen after successful login
-        setTimeout(() => {
-          router.push('/(tabs)/home');
-        }, 1000);
+      if (storedCredentials) {
+        // Parse stored credentials
+        const { email, password } = JSON.parse(storedCredentials);
+        
+        // Authenticate with biometrics
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: `Authenticate with ${biometricType || 'biometrics'}`,
+          fallbackLabel: 'Use Passcode',
+          disableDeviceFallback: true,
+        });
+        
+        if (result.success) {
+          // Login with stored credentials
+          await login(email, password);
+          setBiometricBtnState("success");
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          // Navigate to tabs screen after successful login
+          setTimeout(() => {
+            router.push('/(tab)/home');
+          }, 1000);
+        } else {
+          setBiometricBtnState("error");
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          // Show error message to user
+          setPassError("Biometric authentication failed");
+          
+          // Reset button state after 5 seconds
+          setTimeout(() => {
+            setBiometricBtnState("idle");
+          }, 5000);
+        }
       } else {
+        // No stored credentials, prompt user to enable biometric auth
         setBiometricBtnState("error");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        // Show error message to user
-        setPassError("Biometric authentication failed");
+        setPassError("Biometric authentication not set up. Please login normally first.");
         
         // Reset button state after 5 seconds
         setTimeout(() => {
@@ -351,6 +374,17 @@ export default function HomeScreen({ onNavigateToSignUp }: { onNavigateToSignUp?
       setTimeout(() => {
         setBiometricBtnState("idle");
       }, 5000);
+    }
+  };
+
+  // Function to store credentials for biometric authentication
+  const storeBiometricCredentials = async (email: string, password: string) => {
+    try {
+      // Store credentials securely
+      await AsyncStorage.setItem('biometricCredentials', JSON.stringify({ email, password }));
+      console.log('Biometric credentials stored successfully');
+    } catch (error) {
+      console.error('Failed to store biometric credentials:', error);
     }
   };
 
@@ -648,9 +682,9 @@ const styles = StyleSheet.create({
   innerContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20, zIndex: 10 },
   title: { fontSize: 36, fontWeight: "700", color: "#000", zIndex: 10 },
   fieldContainer: { width: "100%", marginBottom: 14, position: "relative" },
-  floatingLabel: { position: "absolute", left: 16, top: 14, color: "#374151", fontWeight: "500", backgroundColor: "transparent" },
+  floatingLabel: { position: "absolute", left: 16, top: 14, color: "#374151", fontWeight: "500", backgroundColor: "transparent", zIndex: 2 },
   formCard: { width: "100%", maxWidth: 380, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.9)", padding: 20, gap: 16, ...cardShadow },
-  input: { width: "100%", height: 56, borderWidth: 1.5, borderColor: "#0a84ff", borderRadius: 12, marginBottom: 6, paddingHorizontal: 15, paddingTop: 18, paddingBottom: 10, fontSize: 16, color: "#000", backgroundColor: "rgba(255,255,255,0.98)" },
+  input: { width: "100%", height: 56, borderWidth: 1.5, borderColor: "#0a84ff", borderRadius: 12, marginBottom: 6, paddingHorizontal: 15, paddingTop: 18, paddingBottom: 10, fontSize: 16, color: "#000", backgroundColor: "rgba(255,255,255,0.98)", zIndex: 1 },
   inputError: { borderColor: "#ef4444" },
   errorText: { color: "#ef4444", fontSize: 12, marginTop: 6 },
   eye: { position: "absolute", right: 12, top: 18, height: 24, width: 24, alignItems: "center", justifyContent: "center" },

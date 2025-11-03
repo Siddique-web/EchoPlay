@@ -5,6 +5,7 @@ interface Music {
   title: string;
   artist: string;
   url: string;
+  created_at?: string;
 }
 
 type PlaybackCommand = 'play' | 'pause' | 'stop' | 'toggle';

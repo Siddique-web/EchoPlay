@@ -30,13 +30,6 @@ export default function TabLayout() {
           drawerType: 'slide',
         }}>
         <Drawer.Screen
-          name="home"
-          options={{
-            title: 'Home',
-            drawerIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-          }}
-        />
-        <Drawer.Screen
           name="explore"
           options={{
             title: 'Explore',
@@ -52,13 +45,6 @@ export default function TabLayout() {
             }}
           />
         )}
-        <Drawer.Screen
-          name="profile"
-          options={{
-            title: 'Meu Perfil',
-            drawerIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
-          }}
-        />
         <Drawer.Screen
           name="immersive"
           options={{

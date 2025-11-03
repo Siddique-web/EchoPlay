@@ -1,5 +1,9 @@
 import { getCurrentUser, loginUser as loginUserService, logout as logoutService, registerUser as registerUserService } from '@/utils/db/database';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+
+// Import the API service to check for stored tokens
+import { apiService } from '@/services/api';
 
 interface User {
   id: number;
@@ -26,15 +30,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check if user is already logged in
-    try {
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
+    const checkAuthStatus = async () => {
+      try {
+        // First check if there's a stored token
+        const token = await apiService.getStoredToken();
+        if (token) {
+          // If there's a token, try to get the current user
+          const currentUser = getCurrentUser();
+          if (currentUser) {
+            setUser(currentUser);
+          }
+        }
+      } catch (error) {
+        console.log('Error checking auth status:', error);
       }
-    } catch (error) {
-      console.log('Error getting current user:', error);
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    checkAuthStatus();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -67,6 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await logoutService();
       setUser(null);
+      
+      // Remove biometric credentials on logout
+      await AsyncStorage.removeItem('biometricCredentials');
     } catch (error) {
       // Error is already logged in the service, just rethrow
       throw error;

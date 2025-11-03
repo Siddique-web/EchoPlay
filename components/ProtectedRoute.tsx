@@ -32,7 +32,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
     // If user is authenticated and trying to access login page, redirect to home
     if (user && (pathname === '/' || pathname === '/index')) {
-      router.replace('/(tabs)/home');
+      router.replace('/(tab)/home');
       setChecked(true);
       return;
     }

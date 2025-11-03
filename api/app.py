@@ -111,6 +111,7 @@ def init_db():
                 print(f"Error adding is_admin column: {alter_error}")
         
         # Create default admin user if not exists
+        admin_user = None
         try:
             admin_user = User.query.filter_by(email='admin@gmail.com').first()
             if not admin_user:
@@ -129,6 +130,112 @@ def init_db():
                 print("Admin user updated successfully!")
         except Exception as e:
             print(f"Error creating admin user: {e}")
+        
+        # Add default electronic music videos and tracks
+        try:
+            # Check if we already have default content
+            existing_videos = Video.query.count()
+            existing_musics = Music.query.count()
+            
+            if existing_videos == 0 and existing_musics == 0:
+                # Add 5 default electronic music videos
+                default_videos = [
+                    {
+                        'title': 'Strobe - Deadmau5',
+                        'description': 'Official music video for Strobe by Deadmau5',
+                        'url': 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+                        'thumbnail': 'https://sample-videos.com/img/Sample-jpg-image-100kb.jpg',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    },
+                    {
+                        'title': 'Around the World - Daft Punk',
+                        'description': 'Classic electronic music video by Daft Punk',
+                        'url': 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+                        'thumbnail': 'https://sample-videos.com/img/Sample-jpg-image-100kb.jpg',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    },
+                    {
+                        'title': 'Titanium - David Guetta',
+                        'description': 'Electronic dance music hit with Sia',
+                        'url': 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+                        'thumbnail': 'https://sample-videos.com/img/Sample-jpg-image-100kb.jpg',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    },
+                    {
+                        'title': 'Wake Me Up - Avicii',
+                        'description': 'Famous electronic music video by Avicii',
+                        'url': 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+                        'thumbnail': 'https://sample-videos.com/img/Sample-jpg-image-100kb.jpg',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    },
+                    {
+                        'title': 'Animals - Martin Garrix',
+                        'description': 'Big room house anthem by Martin Garrix',
+                        'url': 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+                        'thumbnail': 'https://sample-videos.com/img/Sample-jpg-image-100kb.jpg',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    }
+                ]
+                
+                # Add 5 default electronic music tracks
+                default_musics = [
+                    {
+                        'title': 'Strobe',
+                        'artist': 'Deadmau5',
+                        'url': 'https://sample-music.com/mp3/1mb/sample.mp3',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    },
+                    {
+                        'title': 'One More Time',
+                        'artist': 'Daft Punk',
+                        'url': 'https://sample-music.com/mp3/1mb/sample.mp3',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    },
+                    {
+                        'title': 'Titanium',
+                        'artist': 'David Guetta ft. Sia',
+                        'url': 'https://sample-music.com/mp3/1mb/sample.mp3',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    },
+                    {
+                        'title': 'Levels',
+                        'artist': 'Avicii',
+                        'url': 'https://sample-music.com/mp3/1mb/sample.mp3',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    },
+                    {
+                        'title': 'Animals',
+                        'artist': 'Martin Garrix',
+                        'url': 'https://sample-music.com/mp3/1mb/sample.mp3',
+                        'uploaded_by': admin_user.id if admin_user else 1
+                    }
+                ]
+                
+                # Insert default videos
+                for video_data in default_videos:
+                    video = Video()
+                    video.title = video_data['title']
+                    video.description = video_data['description']
+                    video.url = video_data['url']
+                    video.thumbnail = video_data['thumbnail']
+                    video.uploaded_by = video_data['uploaded_by']
+                    db.session.add(video)
+                
+                # Insert default musics
+                for music_data in default_musics:
+                    music = Music()
+                    music.title = music_data['title']
+                    music.artist = music_data['artist']
+                    music.url = music_data['url']
+                    music.uploaded_by = music_data['uploaded_by']
+                    db.session.add(music)
+                
+                db.session.commit()
+                print("Added default electronic music content")
+            else:
+                print("Default content already exists")
+        except Exception as e:
+            print(f"Error adding default content: {e}")
 
 # Initialize the database when the module is imported
 init_db()

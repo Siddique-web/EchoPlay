@@ -11,7 +11,7 @@ import { MusicProvider } from '../contexts/MusicContext';
 import { initDB } from '../utils/db/database';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  anchor: '(tab)',
 };
 
 export default function RootLayout() {
@@ -75,6 +75,7 @@ export default function RootLayout() {
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
             <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(tab)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="immersive" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />

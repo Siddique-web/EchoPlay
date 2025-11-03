@@ -1,4 +1,5 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { addItemToFolder, Folder, getFoldersByType } from '@/utils/folderUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { useEvent } from 'expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,18 +26,73 @@ export default function VideoPlayerScreen() {
     videoData = {};
   }
 
-  // Create video player
+  // Create video player with better error handling
   const player = useVideoPlayer(videoData?.url || '', (player) => {
     player.loop = false;
     player.muted = false;
-    player.play();
+    // Only autoplay if there's a valid URL
+    if (videoData?.url) {
+      player.play();
+    }
   });
 
   // Get player status using useEvent hook
   const { status } = useEvent(player, 'statusChange', { status: player.status });
 
   const handleBack = () => {
-    router.back();
+    // Navigate back to the home screen instead of just going back
+    router.replace('/(tab)/home');
+  };
+
+  const showAddToFolderModal = async () => {
+    if (!videoData) return;
+    
+    try {
+      // Create folder item from video data
+      const folderItem = {
+        id: videoData.id || Date.now().toString(),
+        title: videoData.title || 'Untitled Video',
+        description: videoData.description || '',
+        url: videoData.url || '',
+        thumbnail: videoData.image?.uri || '',
+        createdAt: new Date().toISOString()
+      };
+      
+      // Get available video folders
+      const folders = await getFoldersByType('video');
+      
+      if (folders.length === 0) {
+        Alert.alert(
+          'No Folders', 
+          'You don\'t have any video folders. Create one first in the Folders tab.',
+          [
+            { text: 'OK' },
+            { text: 'Go to Folders', onPress: () => router.push('/(tab)/folders') }
+          ]
+        );
+        return;
+      }
+      
+      // Show folder selection alert
+      const folderOptions = folders.map((folder: Folder) => ({
+        text: folder.name,
+        onPress: () => addItemToFolder(folder.id, folderItem)
+          .then(() => Alert.alert('Success', 'Video added to folder successfully'))
+          .catch((error: any) => Alert.alert('Error', error.message || 'Failed to add video to folder'))
+      }));
+      
+      Alert.alert(
+        'Add to Folder',
+        'Select a folder to add this video to:',
+        [
+          ...folderOptions,
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } catch (error: any) {
+      console.error('Error showing add to folder modal:', error);
+      Alert.alert('Error', 'Failed to show folder options');
+    }
   };
 
   // Update loading state based on player status
@@ -50,7 +106,7 @@ export default function VideoPlayerScreen() {
     } else if (status === 'error') {
       setLoading(false);
       setError(true);
-      Alert.alert('Error', 'Failed to load video');
+      Alert.alert('Error', 'Failed to load video. Please check your internet connection and try again.');
     }
   }, [status]);
 
@@ -86,6 +142,9 @@ export default function VideoPlayerScreen() {
               <Text style={[styles.errorText, { color: isDark ? '#ccc' : '#666' }]}>
                 Failed to load video
               </Text>
+              <Text style={[styles.errorSubText, { color: isDark ? '#999' : '#999' }]}>
+                Please check your internet connection
+              </Text>
               <TouchableOpacity 
                 style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
                 onPress={() => window.location.reload()}
@@ -103,7 +162,7 @@ export default function VideoPlayerScreen() {
                 onError={() => {
                   setError(true);
                   setLoading(false);
-                  Alert.alert('Error', 'Failed to load video');
+                  Alert.alert('Error', 'Failed to load video. Please check your internet connection and try again.');
                 }}
               />
             ) : (
@@ -111,6 +170,9 @@ export default function VideoPlayerScreen() {
                 <Ionicons name="alert-circle" size={48} color="#ef4444" />
                 <Text style={[styles.errorText, { color: isDark ? '#ccc' : '#666' }]}>
                   No video URL available
+                </Text>
+                <Text style={[styles.errorSubText, { color: isDark ? '#999' : '#999' }]}>
+                  This video may not be available
                 </Text>
               </View>
             )
@@ -139,7 +201,12 @@ export default function VideoPlayerScreen() {
         <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]} numberOfLines={1}>
           {videoData?.title || 'Video Player'}
         </Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity 
+          onPress={showAddToFolderModal}
+          style={styles.headerButton}
+        >
+          <Ionicons name="folder" size={24} color={isDark ? '#fff' : '#000'} />
+        </TouchableOpacity>
       </View>
 
       {/* Video Player */}
@@ -159,11 +226,16 @@ export default function VideoPlayerScreen() {
             <Text style={[styles.errorText, { color: isDark ? '#ccc' : '#666' }]}>
               Failed to load video
             </Text>
+            <Text style={[styles.errorSubText, { color: isDark ? '#999' : '#999' }]}>
+              Please check your internet connection
+            </Text>
             <TouchableOpacity 
               style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
               onPress={() => {
                 // Reinitialize the player
-                player.replace(videoData?.url || '');
+                if (videoData?.url) {
+                  player.replace(videoData.url);
+                }
               }}
             >
               <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
@@ -174,8 +246,6 @@ export default function VideoPlayerScreen() {
             <VideoView
               style={styles.video}
               player={player}
-              allowsFullscreen
-              allowsPictureInPicture
             />
           </View>
         ) : (
@@ -183,6 +253,9 @@ export default function VideoPlayerScreen() {
             <Ionicons name="alert-circle" size={48} color="#ef4444" />
             <Text style={[styles.errorText, { color: isDark ? '#ccc' : '#666' }]}>
               No video URL available
+            </Text>
+            <Text style={[styles.errorSubText, { color: isDark ? '#999' : '#999' }]}>
+              This video may not be available
             </Text>
           </View>
         )}
@@ -259,15 +332,20 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 10,
     fontSize: 16,
+    fontWeight: 'bold',
     textAlign: 'center',
-    paddingHorizontal: 20,
-    color: '#ccc',
+  },
+  errorSubText: {
+    marginTop: 5,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   retryButton: {
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
-    marginTop: 20,
+    marginTop: 10,
   },
   retryButtonText: {
     fontSize: 16,
@@ -289,5 +367,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     color: '#666',
+  },
+  headerButton: {
+    padding: 5,
+    marginLeft: 10,
   },
 });

@@ -34,11 +34,6 @@ export default function CustomDrawerContent(props: DrawerContentComponentProps) 
     router.push('/settings');
   };
 
-  const navigateToProfile = () => {
-    props.navigation.closeDrawer();
-    router.push('/(tabs)/profile');
-  };
-
   const navigateToAdmin = () => {
     props.navigation.closeDrawer();
     router.push('/(tabs)/admin');
@@ -49,7 +44,10 @@ export default function CustomDrawerContent(props: DrawerContentComponentProps) 
       <DrawerContentScrollView {...props}>
         {/* User Profile Section */}
         <View style={[styles.profileSection, { backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5' }]}>
-          <TouchableOpacity onPress={navigateToProfile}>
+          <TouchableOpacity onPress={() => {
+            props.navigation.closeDrawer();
+            props.navigation.navigate('(tab)', { screen: 'profile' });
+          }}>
             {profileImage ? (
               <Image source={{ uri: profileImage }} style={styles.profileImage} />
             ) : (
@@ -71,7 +69,7 @@ export default function CustomDrawerContent(props: DrawerContentComponentProps) 
             style={styles.drawerItem}
             onPress={() => {
               props.navigation.closeDrawer();
-              props.navigation.navigate('home');
+              props.navigation.navigate('(tab)', { screen: 'home' });
             }}
           >
             <IconSymbol size={24} name="house.fill" color={Colors[colorScheme ?? 'light'].tint} />
@@ -86,13 +84,6 @@ export default function CustomDrawerContent(props: DrawerContentComponentProps) 
           >
             <IconSymbol size={24} name="paperplane.fill" color={Colors[colorScheme ?? 'light'].tint} />
             <Text style={[styles.drawerItemText, { color: isDark ? '#fff' : '#000' }]}>Explore</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.drawerItem}
-            onPress={navigateToProfile}
-          >
-            <IconSymbol size={24} name="person.fill" color={Colors[colorScheme ?? 'light'].tint} />
-            <Text style={[styles.drawerItemText, { color: isDark ? '#fff' : '#000' }]}>Meu Perfil</Text>
           </TouchableOpacity>
           {user?.email === 'admin@gmail.com' && (
             <TouchableOpacity 

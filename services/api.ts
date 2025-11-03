@@ -23,19 +23,44 @@ let currentToken: string | null = null;
 // In production, this should be the actual server address
 const API_BASE_URL = 'http://192.168.18.93:5000/api'; // Updated to use the correct IP
 
-// Store token in memory
-const storeToken = (token: string) => {
+// Import AsyncStorage
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Store token in memory and AsyncStorage
+const storeToken = async (token: string) => {
   currentToken = token;
+  try {
+    await AsyncStorage.setItem('userToken', token);
+  } catch (error) {
+    console.error('Error storing token:', error);
+  }
 };
 
-// Get token from memory
+// Get token from memory or AsyncStorage
 const getToken = (): string | null => {
   return currentToken;
 };
 
-// Remove token from memory
-const removeToken = () => {
+// Get token from AsyncStorage (for initial load)
+const getStoredToken = async (): Promise<string | null> => {
+  try {
+    const token = await AsyncStorage.getItem('userToken');
+    currentToken = token;
+    return token;
+  } catch (error) {
+    console.error('Error retrieving token:', error);
+    return null;
+  }
+};
+
+// Remove token from memory and AsyncStorage
+const removeToken = async () => {
   currentToken = null;
+  try {
+    await AsyncStorage.removeItem('userToken');
+  } catch (error) {
+    console.error('Error removing token:', error);
+  }
 };
 
 // Fallback authentication for when API is not available
@@ -60,7 +85,7 @@ const fallbackLogin = async (email: string, password: string) => {
     
     // Generate a mock token
     const token = 'mock-jwt-token-for-' + normalizedEmail;
-    storeToken(token);
+    await storeToken(token);
     
     return { success: true, user, token };
   } else {
@@ -70,7 +95,7 @@ const fallbackLogin = async (email: string, password: string) => {
       // In a real app, we would check the password hash
       // For demo purposes, we'll just check if the user exists
       const token = 'mock-jwt-token-for-' + normalizedEmail;
-      storeToken(token);
+      await storeToken(token);
       return { success: true, user, token };
     } else {
       return { success: false, error: 'Invalid credentials' };
@@ -100,7 +125,7 @@ const fallbackRegister = async (email: string, password: string, name?: string) 
   
   // Generate a mock token
   const token = 'mock-jwt-token-for-' + email;
-  storeToken(token);
+  await storeToken(token);
   
   return { success: true, user: newUser, token };
 };
@@ -125,11 +150,119 @@ const fallbackUploadProfileImage = async (imageUri: string) => {
   return { success: false, error: 'User not found' };
 };
 
+// Add five sample videos for demonstration
+const addSampleVideos = () => {
+  // Check if we already have videos to avoid duplicates
+  if (videos.length > 0) return;
+  
+  const sampleVideos = [
+    {
+      id: 1,
+      title: "Sunset Beach Vibes",
+      description: "Relaxing beach footage with sunset colors and gentle waves",
+      url: "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4",
+      thumbnail: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400",
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 2,
+      title: "Mountain Adventure",
+      description: "Breathtaking mountain landscapes and hiking trails",
+      url: "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4",
+      thumbnail: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400",
+      created_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
+    },
+    {
+      id: 3,
+      title: "City Night Lights",
+      description: "Urban cityscape with beautiful night illumination",
+      url: "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_5mb.mp4",
+      thumbnail: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400",
+      created_at: new Date(Date.now() - 172800000).toISOString() // 2 days ago
+    },
+    {
+      id: 4,
+      title: "Forest Exploration",
+      description: "Peaceful walk through a lush green forest",
+      url: "https://sample-videos.com/video123/mp4/480/big_buck_bunny_480p_1mb.mp4",
+      thumbnail: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=400",
+      created_at: new Date(Date.now() - 259200000).toISOString() // 3 days ago
+    },
+    {
+      id: 5,
+      title: "Ocean Waves",
+      description: "Calming ocean waves crashing on the shore",
+      url: "https://sample-videos.com/video123/mp4/480/big_buck_bunny_480p_2mb.mp4",
+      thumbnail: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400",
+      created_at: new Date(Date.now() - 345600000).toISOString() // 4 days ago
+    }
+  ];
+  
+  // Add all sample videos to the videos array
+  videos.push(...sampleVideos);
+};
+
+// Add sample music for demonstration
+const addSampleMusic = () => {
+  // Check if we already have music to avoid duplicates
+  if (musics.length > 0) return;
+  
+  const sampleMusics = [
+    {
+      id: 1,
+      title: "Summer Breeze",
+      artist: "The Relaxation Collective",
+      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+      created_at: new Date().toISOString()
+    },
+    {
+      id: 2,
+      title: "Ocean Dreams",
+      artist: "Nature Sounds",
+      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+      created_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
+    },
+    {
+      id: 3,
+      title: "Mountain Echo",
+      artist: "Outdoor Vibes",
+      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+      created_at: new Date(Date.now() - 172800000).toISOString() // 2 days ago
+    },
+    {
+      id: 4,
+      title: "Forest Whispers",
+      artist: "Natural Harmony",
+      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+      created_at: new Date(Date.now() - 259200000).toISOString() // 3 days ago
+    },
+    {
+      id: 5,
+      title: "City Lights",
+      artist: "Urban Beats",
+      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+      created_at: new Date(Date.now() - 345600000).toISOString() // 4 days ago
+    }
+  ];
+  
+  // Add all sample music to the musics array
+  musics.push(...sampleMusics);
+};
+
+// Call the functions to add sample content
+addSampleVideos();
+addSampleMusic();
+
 // API service functions
 export const apiService = {
   // Get token (exported for file upload)
   getToken: (): string | null => {
     return getToken();
+  },
+  
+  // Get stored token (for initial load)
+  getStoredToken: async (): Promise<string | null> => {
+    return getStoredToken();
   },
   
   // Login user
@@ -157,7 +290,7 @@ export const apiService = {
       
       if (response.ok) {
         // Store token
-        storeToken(data.token);
+        await storeToken(data.token);
         return { success: true, user: data.user, token: data.token };
       } else {
         // If API returns an error, fallback to local authentication
@@ -192,7 +325,7 @@ export const apiService = {
       
       if (response.ok) {
         // Store token
-        storeToken(data.token);
+        await storeToken(data.token);
         return { success: true, user: data.user, token: data.token };
       } else {
         // If API returns an error, fallback to local registration
@@ -235,7 +368,7 @@ export const apiService = {
       } else {
         // If token is invalid, remove it
         if (data.message === 'Token is invalid!') {
-          removeToken();
+          await removeToken();
         }
         // Fallback to local user data
         console.log('API profile retrieval failed, falling back to local data');
@@ -412,33 +545,67 @@ export const apiService = {
         return { success: false, error: 'No token found' };
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/videos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        body: JSON.stringify(videoData),
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Add to local storage as well for immediate feedback
-        const newVideo = {
-          ...data.video,
-          created_at: new Date().toISOString()
-        };
-        videos.push(newVideo);
-        return { success: true, video: newVideo };
+      // For file uploads, we need to handle FormData properly
+      if (videoData.url.startsWith('blob:') || videoData.url.startsWith('file:')) {
+        // This is a local file, handle it differently
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(`${API_BASE_URL}/videos`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-token': token,
+          },
+          body: JSON.stringify(videoData),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Add to local storage as well for immediate feedback
+          const newVideo = {
+            ...data.video,
+            created_at: new Date().toISOString()
+          };
+          videos.push(newVideo);
+          return { success: true, video: newVideo };
+        } else {
+          return { success: false, error: data.message };
+        }
       } else {
-        return { success: false, error: data.message };
+        // This is a URL, handle it normally
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(`${API_BASE_URL}/videos`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-token': token,
+          },
+          body: JSON.stringify(videoData),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Add to local storage as well for immediate feedback
+          const newVideo = {
+            ...data.video,
+            created_at: new Date().toISOString()
+          };
+          videos.push(newVideo);
+          return { success: true, video: newVideo };
+        } else {
+          return { success: false, error: data.message };
+        }
       }
     } catch (error) {
       console.log('Network error adding video, using fallback');
@@ -517,33 +684,67 @@ export const apiService = {
         return { success: false, error: 'No token found' };
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/music`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        body: JSON.stringify(musicData),
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Add to local storage as well for immediate feedback
-        const newMusic = {
-          ...data.music,
-          created_at: new Date().toISOString()
-        };
-        musics.push(newMusic);
-        return { success: true, music: newMusic };
+      // For file uploads, we need to handle FormData properly
+      if (musicData.url.startsWith('blob:') || musicData.url.startsWith('file:')) {
+        // This is a local file, handle it differently
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(`${API_BASE_URL}/music`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-token': token,
+          },
+          body: JSON.stringify(musicData),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Add to local storage as well for immediate feedback
+          const newMusic = {
+            ...data.music,
+            created_at: new Date().toISOString()
+          };
+          musics.push(newMusic);
+          return { success: true, music: newMusic };
+        } else {
+          return { success: false, error: data.message };
+        }
       } else {
-        return { success: false, error: data.message };
+        // This is a URL, handle it normally
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(`${API_BASE_URL}/music`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-token': token,
+          },
+          body: JSON.stringify(musicData),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Add to local storage as well for immediate feedback
+          const newMusic = {
+            ...data.music,
+            created_at: new Date().toISOString()
+          };
+          musics.push(newMusic);
+          return { success: true, music: newMusic };
+        } else {
+          return { success: false, error: data.message };
+        }
       }
     } catch (error) {
       console.log('Network error adding music, using fallback');
@@ -685,7 +886,7 @@ export const apiService = {
 
   // Logout user
   logout: async () => {
-    removeToken();
+    await removeToken();
     return { success: true };
   },
 

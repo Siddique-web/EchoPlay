@@ -1,5 +1,6 @@
 import { useMusic } from '@/contexts/MusicContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { addItemToFolder, Folder, getFoldersByType } from '@/utils/folderUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -36,7 +37,8 @@ export default function MusicPlayerScreen() {
   console.log('Music data received:', musicData);
 
   const handleBack = () => {
-    router.back();
+    // Navigate back to the home screen instead of just going back
+    router.replace('/(tab)/home');
   };
 
   const loadSound = async () => {
@@ -51,7 +53,7 @@ export default function MusicPlayerScreen() {
       console.log('Attempting to load sound from URL:', musicData.url);
       
       // Check if URL is valid
-      if (!musicData.url.startsWith('http')) {
+      if (!musicData.url.startsWith('http') && !musicData.url.startsWith('blob:') && !musicData.url.startsWith('file:')) {
         console.error('Invalid URL:', musicData.url);
         setError(true);
         setLoading(false);
@@ -98,12 +100,18 @@ export default function MusicPlayerScreen() {
       setIsPlaying(true); // Update global context
       setCurrentMusic(musicData); // Update global context with current music
       
-      sound.setOnPlaybackStatusUpdate((status) => {
+      sound.setOnPlaybackStatusUpdate((status: any) => {
         console.log('Playback status update:', status);
         if (status.isLoaded) {
           setIsPlaying(status.isPlaying); // Update global context
           setPosition(status.positionMillis);
           setDuration(status.durationMillis || 0);
+          
+          // When music finishes, stop playback
+          if (status.didJustFinish) {
+            setIsPlaying(false);
+            setCurrentMusic(null);
+          }
         } else if (status.error) {
           console.error('Playback error:', status.error);
           setError(true);
@@ -118,7 +126,7 @@ export default function MusicPlayerScreen() {
       setError(true);
       setLoading(false);
       setIsPlaying(false); // Update global context
-      Alert.alert('Error', 'Failed to load music: ' + (err as Error).message);
+      Alert.alert('Error', 'Failed to load music. Please check your internet connection and try again.');
     }
   };
 
@@ -181,11 +189,68 @@ export default function MusicPlayerScreen() {
     try {
       const status = await soundRef.current.getStatusAsync();
       if (status.isLoaded) {
-        const newPosition = Math.max(status.positionMillis - 10000, 0);
-        await soundRef.current.setPositionAsync(newPosition);
+        // If we're more than 3 seconds into the song, skip back to beginning
+        // Otherwise, go to previous song (if implemented)
+        if (status.positionMillis > 3000) {
+          await soundRef.current.setPositionAsync(0);
+        } else {
+          // For now, just restart the current song
+          await soundRef.current.setPositionAsync(0);
+        }
       }
     } catch (err) {
       console.error('Error skipping backward:', err);
+    }
+  };
+
+  const showAddToFolderModal = async () => {
+    if (!musicData) return;
+    
+    try {
+      // Create folder item from music data
+      const folderItem = {
+        id: musicData.id || Date.now().toString(),
+        title: musicData.title || 'Untitled Music',
+        artist: musicData.artist || 'Unknown Artist',
+        url: musicData.url || '',
+        duration: formatTime(duration),
+        createdAt: new Date().toISOString()
+      };
+      
+      // Get available music folders
+      const folders = await getFoldersByType('music');
+      
+      if (folders.length === 0) {
+        Alert.alert(
+          'No Folders', 
+          'You don\'t have any music folders. Create one first in the Folders tab.',
+          [
+            { text: 'OK' },
+            { text: 'Go to Folders', onPress: () => router.push('/(tab)/folders') }
+          ]
+        );
+        return;
+      }
+      
+      // Show folder selection alert
+      const folderOptions = folders.map((folder: Folder) => ({
+        text: folder.name,
+        onPress: () => addItemToFolder(folder.id, folderItem)
+          .then(() => Alert.alert('Success', 'Music added to folder successfully'))
+          .catch((error: any) => Alert.alert('Error', error.message || 'Failed to add music to folder'))
+      }));
+      
+      Alert.alert(
+        'Add to Folder',
+        'Select a folder to add this music to:',
+        [
+          ...folderOptions,
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } catch (error: any) {
+      console.error('Error showing add to folder modal:', error);
+      Alert.alert('Error', 'Failed to show folder options');
     }
   };
 
@@ -204,6 +269,11 @@ export default function MusicPlayerScreen() {
           togglePlayback();
         }
         break;
+      case 'stop':
+        if (soundRef.current) {
+          stopPlayback();
+        }
+        break;
       case 'toggle':
         if (soundRef.current) {
           togglePlayback();
@@ -216,6 +286,24 @@ export default function MusicPlayerScreen() {
     clearPlaybackCommand();
   }, [playbackCommand]);
 
+  const stopPlayback = async () => {
+    if (!soundRef.current) return;
+    
+    try {
+      const status = await soundRef.current.getStatusAsync();
+      if (status.isLoaded) {
+        if (status.isPlaying) {
+          await soundRef.current.stopAsync();
+        }
+        // Reset position to beginning
+        await soundRef.current.setPositionAsync(0);
+        setIsPlaying(false); // Update global context
+      }
+    } catch (err) {
+      console.error('Error stopping playback:', err);
+    }
+  };
+
   const formatTime = (millis: number) => {
     if (isNaN(millis) || millis <= 0) return '0:00';
     const totalSeconds = Math.floor(millis / 1000);
@@ -225,6 +313,21 @@ export default function MusicPlayerScreen() {
   };
 
   useEffect(() => {
+    // When this component mounts, stop any currently playing sound
+    const stopCurrentSound = async () => {
+      if (currentSound) {
+        try {
+          const status = await currentSound.getStatusAsync();
+          if (status.isLoaded && status.isPlaying) {
+            await currentSound.stopAsync();
+          }
+        } catch (err) {
+          console.log('Error stopping current sound:', err);
+        }
+      }
+    };
+    
+    stopCurrentSound();
     loadSound();
     
     return () => {
@@ -286,13 +389,25 @@ export default function MusicPlayerScreen() {
         <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]} numberOfLines={1}>
           {musicData?.title || 'Music Player'}
         </Text>
-        <TouchableOpacity onPress={toggleFavorite} style={styles.favoriteButton}>
-          <Ionicons 
-            name={isFavorite ? "heart" : "heart-outline"} 
-            size={24} 
-            color={isFavorite ? "#ef4444" : (isDark ? '#fff' : '#000')} 
-          />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}> 
+          <TouchableOpacity onPress={toggleFavorite} style={styles.headerButton}>
+            <Ionicons 
+              name={isFavorite ? "heart" : "heart-outline"} 
+              size={24} 
+              color={isFavorite ? "#ef4444" : (isDark ? '#fff' : '#000')} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={showAddToFolderModal} 
+            style={styles.headerButton}
+          >
+            <Ionicons 
+              name="folder" 
+              size={24} 
+              color={isDark ? '#fff' : '#000'} 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -384,9 +499,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 10,
-  },
-  favoriteButton: {
-    padding: 5,
   },
   content: {
     flex: 1,
@@ -485,5 +597,12 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 30,
     marginHorizontal: 20,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+  },
+  headerButton: {
+    padding: 5,
+    marginLeft: 10,
   },
 });

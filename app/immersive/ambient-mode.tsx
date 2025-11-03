@@ -1,8 +1,8 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function AmbientModeScreen() {
   const router = useRouter();
@@ -10,6 +10,38 @@ export default function AmbientModeScreen() {
   const isDark = colorScheme === 'dark';
   const [isAmbientMode, setIsAmbientMode] = useState(false);
   const [selectedLight, setSelectedLight] = useState('all');
+  const [selectedColor, setSelectedColor] = useState('#FF5252'); // Default to Energy color
+  const [isPlaying, setIsPlaying] = useState(false); // Simulate music playing state
+
+  // Animation values for corner lights
+  const cornerOpacity = useRef(new Animated.Value(0)).current;
+  const cornerScale = useRef(new Animated.Value(1)).current;
+
+  // Simulate audio levels for pulsing effect
+  useEffect(() => {
+    if (!isAmbientMode || !isPlaying) return;
+    
+    const interval = setInterval(() => {
+      // Simulate audio level changes
+      const level = Math.random() * 100;
+      
+      // Animate based on audio level
+      Animated.parallel([
+        Animated.timing(cornerOpacity, {
+          toValue: 0.3 + (level / 300),
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cornerScale, {
+          toValue: 1 + (level / 500),
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [isAmbientMode, isPlaying]);
 
   const toggleAmbientMode = () => {
     setIsAmbientMode(!isAmbientMode);
@@ -30,6 +62,38 @@ export default function AmbientModeScreen() {
     { name: 'Romance', color: '#9C27B0', description: 'Roxo romântico' },
     { name: 'Neutro', color: '#FFFFFF', description: 'Branco puro' },
   ];
+
+  // Corner light component
+  const CornerLight = ({ position }: { position: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' }) => {
+    const getPositionStyle = () => {
+      switch (position) {
+        case 'topLeft':
+          return { top: 20, left: 20 };
+        case 'topRight':
+          return { top: 20, right: 20 };
+        case 'bottomLeft':
+          return { bottom: 20, left: 20 };
+        case 'bottomRight':
+          return { bottom: 20, right: 20 };
+        default:
+          return {};
+      }
+    };
+
+    return (
+      <Animated.View
+        style={[
+          styles.cornerLight,
+          getPositionStyle(),
+          {
+            backgroundColor: selectedColor,
+            opacity: cornerOpacity,
+            transform: [{ scale: cornerScale }],
+          },
+        ]}
+      />
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#fff' }]}>
@@ -133,7 +197,7 @@ export default function AmbientModeScreen() {
               <TouchableOpacity
                 key={index}
                 style={styles.colorPreset}
-                onPress={() => {}}
+                onPress={() => setSelectedColor(preset.color)}
               >
                 <View 
                   style={[
@@ -154,6 +218,29 @@ export default function AmbientModeScreen() {
           </View>
         </View>
 
+        {/* Music Simulation Toggle */}
+        <View style={[styles.card, { backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5' }]}>
+          <View style={styles.toggleHeader}>
+            <Text style={[styles.cardTitle, { color: isDark ? '#fff' : '#000' }]}>
+              Simular Música
+            </Text>
+            <TouchableOpacity 
+              style={[styles.toggleButton, { backgroundColor: isPlaying ? '#0a84ff' : '#ccc' }]}
+              onPress={() => setIsPlaying(!isPlaying)}
+            >
+              <View style={[styles.toggleKnob, { 
+                transform: [{ translateX: isPlaying ? 20 : 0 }],
+                backgroundColor: '#fff'
+              }]} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.cardDescription, { color: isDark ? '#ccc' : '#666' }]}>
+            {isPlaying 
+              ? 'Simulação de música ativada - As luzes estão pulsando' 
+              : 'Ative para simular música e ver as luzes pulsando'}
+          </Text>
+        </View>
+
         {/* 3D Sound Info */}
         <View style={[styles.infoCard, { backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5' }]}>
           <Ionicons name="volume-high" size={24} color="#0a84ff" style={styles.infoIcon} />
@@ -167,6 +254,16 @@ export default function AmbientModeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Corner lights - only visible when ambient mode is active */}
+      {isAmbientMode && (
+        <>
+          <CornerLight position="topLeft" />
+          <CornerLight position="topRight" />
+          <CornerLight position="bottomLeft" />
+          <CornerLight position="bottomRight" />
+        </>
+      )}
     </View>
   );
 }
@@ -311,5 +408,13 @@ const styles = StyleSheet.create({
   infoDescription: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  // Corner light styles
+  cornerLight: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    zIndex: 1000,
   },
 });

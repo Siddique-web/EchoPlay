@@ -5,57 +5,40 @@ import { apiService } from '@/services/api';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function AdminScreen() {
-  const { user, logout } = useAuth();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { user, logout } = useAuth();
   
-  // State for video form
+  const [isAdmin, setIsAdmin] = useState(false);
   const [videoTitle, setVideoTitle] = useState('');
   const [videoDescription, setVideoDescription] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
-  const [selectedVideo, setSelectedVideo] = useState<{uri: string, name: string} | null>(null); // For actual video file
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
   
-  // State for music form
   const [musicTitle, setMusicTitle] = useState('');
   const [musicArtist, setMusicArtist] = useState('');
   const [musicUrl, setMusicUrl] = useState('');
-  const [selectedMusic, setSelectedMusic] = useState<{uri: string, name: string} | null>(null); // For actual music file
-  
-  // Loading states
-  const [videoLoading, setVideoLoading] = useState(false);
+  const [selectedMusic, setSelectedMusic] = useState<any>(null);
   const [musicLoading, setMusicLoading] = useState(false);
 
   // Check if user is admin
-  const isAdmin = user?.email === 'admin@gmail.com';
+  useEffect(() => {
+    if (user) {
+      setIsAdmin(user.email === 'admin@gmail.com');
+    }
+  }, [user]);
 
   // Handle logout
-  const handleLogout = () => {
-    Alert.alert(
-      'Confirmar Logout',
-      'Tem certeza que deseja sair?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Sair', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              router.replace('/');
-            } catch (error) {
-              console.error('Error during logout:', error);
-              Alert.alert('Error', 'Failed to logout');
-            }
-          }
-        },
-      ]
-    );
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/');
   };
 
   // Select video file from device
@@ -349,6 +332,146 @@ export default function AdminScreen() {
     }
   };
 
+  // Add sample videos function
+  const addSampleVideos = async () => {
+    const sampleVideos = [
+      {
+        title: "Sunset Beach Vibes",
+        description: "Relaxing beach footage with sunset colors and gentle waves",
+        url: "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4",
+        thumbnail: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400"
+      },
+      {
+        title: "Mountain Adventure",
+        description: "Breathtaking mountain landscapes and hiking trails",
+        url: "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4",
+        thumbnail: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400"
+      },
+      {
+        title: "City Night Lights",
+        description: "Urban cityscape with beautiful night illumination",
+        url: "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_5mb.mp4",
+        thumbnail: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400"
+      },
+      {
+        title: "Forest Exploration",
+        description: "Peaceful walk through a lush green forest",
+        url: "https://sample-videos.com/video123/mp4/480/big_buck_bunny_480p_1mb.mp4",
+        thumbnail: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=400"
+      },
+      {
+        title: "Ocean Waves",
+        description: "Calming ocean waves crashing on the shore",
+        url: "https://sample-videos.com/video123/mp4/480/big_buck_bunny_480p_2mb.mp4",
+        thumbnail: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400"
+      }
+    ];
+
+    Alert.alert(
+      'Adicionar Vídeos de Exemplo',
+      'Deseja adicionar 5 vídeos de exemplo? Isso ajudará os usuários a visualizar o conteúdo.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Adicionar',
+          onPress: async () => {
+            setVideoLoading(true);
+            try {
+              // Add each sample video
+              for (const video of sampleVideos) {
+                const videoData = {
+                  title: video.title,
+                  description: video.description,
+                  url: video.url,
+                  thumbnail: video.thumbnail
+                };
+
+                const result = await apiService.addVideo(videoData);
+                if (!result.success) {
+                  throw new Error(result.error || 'Failed to add video');
+                }
+              }
+              
+              Alert.alert('Sucesso', '5 vídeos de exemplo foram adicionados com sucesso!');
+            } catch (error) {
+              console.error('Error adding sample videos:', error);
+              Alert.alert('Erro', 'Falha ao adicionar vídeos de exemplo.');
+            } finally {
+              setVideoLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Add sample music function
+  const addSampleMusic = async () => {
+    const sampleMusic = [
+      {
+        title: "Summer Breeze",
+        artist: "The Relaxation Collective",
+        url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+      },
+      {
+        title: "Ocean Dreams",
+        artist: "Nature Sounds",
+        url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+      },
+      {
+        title: "Mountain Echo",
+        artist: "Outdoor Vibes",
+        url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+      },
+      {
+        title: "Forest Whispers",
+        artist: "Natural Harmony",
+        url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+      },
+      {
+        title: "City Lights",
+        artist: "Urban Beats",
+        url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
+      }
+    ];
+
+    Alert.alert(
+      'Adicionar Músicas de Exemplo',
+      'Deseja adicionar 5 músicas de exemplo? Isso ajudará os usuários a visualizar o conteúdo.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Adicionar',
+          onPress: async () => {
+            setMusicLoading(true);
+            try {
+              // Add each sample music
+              for (const music of sampleMusic) {
+                const musicData = {
+                  title: music.title,
+                  artist: music.artist,
+                  url: music.url
+                };
+
+                const result = await apiService.addMusic(musicData);
+                if (!result.success) {
+                  throw new Error(result.error || 'Failed to add music');
+                }
+              }
+              
+              Alert.alert('Sucesso', '5 músicas de exemplo foram adicionadas com sucesso!');
+            } catch (error) {
+              console.error('Error adding sample music:', error);
+              Alert.alert('Erro', 'Falha ao adicionar músicas de exemplo.');
+            } finally {
+              setMusicLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // If user is not admin, redirect to home
   if (!isAdmin) {
     router.replace('/(tabs)/home');
@@ -369,6 +492,29 @@ export default function AdminScreen() {
       </View>
       
       <ScrollView style={styles.content}>
+        {/* Add Sample Content Buttons */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={[styles.sampleButton, { backgroundColor: '#10b981' }]}
+            onPress={addSampleVideos}
+            disabled={videoLoading || musicLoading}
+          >
+            <Text style={styles.addButtonText}>
+              {videoLoading ? 'Adicionando...' : 'Adicionar 5 Vídeos de Exemplo'}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.sampleButton, { backgroundColor: '#8b5cf6' }]}
+            onPress={addSampleMusic}
+            disabled={videoLoading || musicLoading}
+          >
+            <Text style={styles.addButtonText}>
+              {musicLoading ? 'Adicionando...' : 'Adicionar 5 Músicas de Exemplo'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Video Management Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: isDark ? '#fff' : '#000' }]}>Gerenciar Vídeos</Text>
@@ -600,6 +746,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
+  },
+  sampleButton: {
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 20,
   },
   addButtonText: {
     color: '#fff',
