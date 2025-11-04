@@ -14,7 +14,19 @@ def create_app():
     
     # Configuration
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_PATH', 'sqlite:///echoplay_api.db')
+    
+    # Database configuration - handle Render environment properly
+    database_url = os.environ.get('DATABASE_PATH')
+    if not database_url:
+        # Default to SQLite for local development
+        database_url = 'sqlite:///echoplay_api.db'
+    
+    # Ensure the database URL is properly formatted
+    if database_url.startswith('sqlite:///') and ':' not in database_url[10:]:
+        # Handle relative path for SQLite
+        database_url = 'sqlite:///echoplay_api.db'
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Configure upload folder

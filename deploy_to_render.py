@@ -25,7 +25,7 @@ def deploy_to_render():
         
         # Commit changes
         print("Committing changes...")
-        subprocess.run(['git', 'commit', '-m', 'Update API with root route and proper configuration'], check=True)
+        subprocess.run(['git', 'commit', '-m', 'Fix database configuration and improve Render deployment'], check=True)
         
         # Push to Render (assuming the Render app is connected to the GitHub repository)
         print("Pushing to GitHub (Render will auto-deploy)...")
@@ -42,6 +42,42 @@ def deploy_to_render():
         print(f"Unexpected error: {e}")
         return False
 
+def check_render_config():
+    """
+    Check if Render configuration files exist and are correct
+    """
+    print("Checking Render configuration...")
+    
+    # Check Procfile
+    procfile_path = 'api/Procfile'
+    if os.path.exists(procfile_path):
+        with open(procfile_path, 'r') as f:
+            content = f.read().strip()
+            if content == 'web: gunicorn app:app -b 0.0.0.0:$PORT --workers 2':
+                print("✓ Procfile is correctly configured")
+            else:
+                print("✗ Procfile has incorrect configuration")
+                print(f"  Current: {content}")
+                print("  Expected: web: gunicorn app:app -b 0.0.0.0:$PORT --workers 2")
+    else:
+        print("✗ Procfile not found")
+    
+    # Check runtime.txt
+    runtime_path = 'api/runtime.txt'
+    if os.path.exists(runtime_path):
+        with open(runtime_path, 'r') as f:
+            content = f.read().strip()
+            if content == 'python-3.13':
+                print("✓ runtime.txt is correctly configured")
+            else:
+                print("✗ runtime.txt has incorrect configuration")
+                print(f"  Current: {content}")
+                print("  Expected: python-3.13")
+    else:
+        print("✗ runtime.txt not found")
+    
+    print("Render configuration check completed.")
+
 if __name__ == "__main__":
     print("EchoPlay API Deployment Script")
     print("=" * 40)
@@ -53,17 +89,26 @@ if __name__ == "__main__":
         print("Error: Git is not installed or not in PATH")
         sys.exit(1)
     
-    # Deploy
-    success = deploy_to_render()
+    # Check Render configuration
+    check_render_config()
+    print()
     
-    if success:
-        print("\nNext steps:")
-        print("1. Wait for Render to complete the deployment (check Render dashboard)")
-        print("2. Test the API endpoints:")
-        print("   - GET https://echoplay-apii.onrender.com/")
-        print("   - GET https://echoplay-apii.onrender.com/api/health")
-        print("   - POST https://echoplay-apii.onrender.com/api/login")
-        print("   - POST https://echoplay-apii.onrender.com/api/register")
+    # Ask user if they want to deploy
+    response = input("Do you want to deploy to Render? (y/N): ")
+    if response.lower() in ['y', 'yes']:
+        # Deploy
+        success = deploy_to_render()
+        
+        if success:
+            print("\nNext steps:")
+            print("1. Wait for Render to complete the deployment (check Render dashboard)")
+            print("2. Test the API endpoints:")
+            print("   - GET https://echoplay-apii.onrender.com/")
+            print("   - GET https://echoplay-apii.onrender.com/api/health")
+            print("   - POST https://echoplay-apii.onrender.com/api/login")
+            print("   - POST https://echoplay-apii.onrender.com/api/register")
+        else:
+            print("\nDeployment failed. Please check the errors above.")
+            sys.exit(1)
     else:
-        print("\nDeployment failed. Please check the errors above.")
-        sys.exit(1)
+        print("Deployment cancelled.")

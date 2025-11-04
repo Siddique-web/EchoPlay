@@ -27,7 +27,7 @@ let currentToken: string | null = null;
 const API_BASE_URL = Constants.expoConfig?.extra?.API_URL || 
   process.env.API_URL || 
   (process.env.NODE_ENV === 'production' 
-    ? 'https://echoplay-apii.onrender.com' 
+    ? 'https://api-echoplay.onrender.com' 
     : 'http://192.168.18.93:5000');
 
 // Store token in memory and AsyncStorage
