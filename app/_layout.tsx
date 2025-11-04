@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -17,6 +17,7 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [appReady, setAppReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
   
   useEffect(() => {
     // Initialize the app
@@ -29,8 +30,11 @@ export default function RootLayout() {
         console.log('App initialized successfully');
       } catch (error: any) {
         console.warn('App initialization failed:', error);
-        // Proceed anyway
-        setAppReady(true);
+        setInitError(error.message || 'Failed to initialize app');
+        // Proceed anyway after a short delay to avoid blocking the UI
+        setTimeout(() => {
+          setAppReady(true);
+        }, 2000);
       }
     };
     
@@ -59,12 +63,35 @@ export default function RootLayout() {
     };
   }, []);
 
+  // Show error screen if initialization failed
+  if (initError && !appReady) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Initialization Error</Text>
+        <Text style={styles.errorText}>{initError}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton} 
+          onPress={() => {
+            setInitError(null);
+            setAppReady(false);
+            // Re-trigger initialization
+            setTimeout(() => {
+              setAppReady(true);
+            }, 1000);
+          }}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   // Don't render the app until it's ready
   if (!appReady) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={{ marginTop: 10, fontSize: 16 }}>Carregando aplicativo...</Text>
+        <Text style={styles.loadingText}>Carregando aplicativo...</Text>
       </View>
     );
   }
@@ -79,6 +106,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="immersive" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            <Stack.Screen name="network-diagnostics" options={{ title: 'Network Diagnostics' }} />
           </Stack>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         </ThemeProvider>
@@ -86,3 +114,45 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5'
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 20
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'red',
+    marginBottom: 10
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'darkred',
+    textAlign: 'center',
+    marginBottom: 20
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold'
+  }
+});

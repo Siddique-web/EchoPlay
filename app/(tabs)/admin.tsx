@@ -8,6 +8,14 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from "react";
 import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
+// Define types for file objects
+interface FileInfo {
+  uri: string;
+  name?: string;
+  fileName?: string;
+  type?: string;
+}
+
 export default function AdminScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -18,14 +26,14 @@ export default function AdminScreen() {
   const [videoTitle, setVideoTitle] = useState('');
   const [videoDescription, setVideoDescription] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
-  const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [videoThumbnail, setVideoThumbnail] = useState<FileInfo | string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<FileInfo | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
   
   const [musicTitle, setMusicTitle] = useState('');
   const [musicArtist, setMusicArtist] = useState('');
   const [musicUrl, setMusicUrl] = useState('');
-  const [selectedMusic, setSelectedMusic] = useState<any>(null);
+  const [selectedMusic, setSelectedMusic] = useState<FileInfo | null>(null);
   const [musicLoading, setMusicLoading] = useState(false);
 
   // Check if user is admin
@@ -145,7 +153,7 @@ export default function AdminScreen() {
           if (file) {
             // Create a local URL for the file
             const imageUri = URL.createObjectURL(file);
-            setVideoThumbnail(imageUri);
+            setVideoThumbnail({uri: imageUri, name: file.name});
           }
         };
         
@@ -168,7 +176,7 @@ export default function AdminScreen() {
         
         if (!result.canceled) {
           const imageUri = result.assets[0].uri;
-          setVideoThumbnail(imageUri);
+          setVideoThumbnail({uri: imageUri});
         }
       }
     } catch (error) {
@@ -179,7 +187,7 @@ export default function AdminScreen() {
 
   // Add new video
   const handleAddVideo = async () => {
-    if (!videoTitle || !selectedVideo) {
+    if (!videoTitle || !videoDescription || (!selectedVideo && !videoUrl)) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios.');
       return;
     }
@@ -187,64 +195,21 @@ export default function AdminScreen() {
     setVideoLoading(true);
     
     try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('title', videoTitle);
-      formData.append('description', videoDescription || '');
+      // Prepare video data for API
+      const thumbnailUri = videoThumbnail ? 
+        (typeof videoThumbnail === 'string' ? videoThumbnail : videoThumbnail.uri) : 
+        undefined;
       
-      // Append video file if selected
-      if (selectedVideo) {
-        const fileName = selectedVideo.name || 'video.mp4';
-        const fileExtension = fileName.split('.').pop() || 'mp4';
-        
-        // For web, we need to handle the blob URL differently
-        if (Platform.OS === 'web' && selectedVideo.uri.startsWith('blob:')) {
-          // For web blob URLs, we'll need to fetch the blob and append it
-          const response = await fetch(selectedVideo.uri);
-          const blob = await response.blob();
-          const file = new File([blob], fileName, { type: blob.type });
-          formData.append('video', file);
-        } else {
-          // For mobile or direct file URLs
-          formData.append('video', {
-            uri: selectedVideo.uri,
-            type: `video/${fileExtension}`,
-            name: fileName,
-          } as any);
-        }
-      }
+      const videoData = {
+        title: videoTitle,
+        description: videoDescription,
+        url: videoUrl || undefined,
+        thumbnail: thumbnailUri
+      };
       
-      // Append thumbnail if selected
-      if (videoThumbnail) {
-        const thumbnailName = 'thumbnail.jpg';
-        
-        if (Platform.OS === 'web' && videoThumbnail.startsWith('blob:')) {
-          const response = await fetch(videoThumbnail);
-          const blob = await response.blob();
-          const file = new File([blob], thumbnailName, { type: 'image/jpeg' });
-          formData.append('thumbnail', file);
-        } else {
-          formData.append('thumbnail', {
-            uri: videoThumbnail,
-            type: 'image/jpeg',
-            name: thumbnailName,
-          } as any);
-        }
-      }
+      const result = await apiService.addVideo(videoData);
       
-      // Use direct fetch for file upload since our API service doesn't handle FormData well
-      const token = apiService.getToken();
-      const response = await fetch('http://192.168.18.93:5000/api/videos', {
-        method: 'POST',
-        headers: {
-          'x-access-token': token || '',
-        },
-        body: formData,
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
+      if (result.success) {
         Alert.alert('Sucesso', 'Vídeo adicionado com sucesso!');
         
         // Clear form
@@ -254,7 +219,7 @@ export default function AdminScreen() {
         setVideoThumbnail(null);
         setSelectedVideo(null);
       } else {
-        Alert.alert('Erro', result.message || 'Falha ao adicionar o vídeo.');
+        Alert.alert('Erro', result.error || 'Falha ao adicionar o vídeo.');
       }
     } catch (error) {
       console.error('Error adding video:', error);
@@ -266,7 +231,7 @@ export default function AdminScreen() {
 
   // Add new music
   const handleAddMusic = async () => {
-    if (!musicTitle || !musicArtist || !selectedMusic) {
+    if (!musicTitle || !musicArtist || (!selectedMusic && !musicUrl)) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios.');
       return;
     }
@@ -274,46 +239,16 @@ export default function AdminScreen() {
     setMusicLoading(true);
     
     try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('title', musicTitle);
-      formData.append('artist', musicArtist);
+      // Prepare music data for API
+      const musicData = {
+        title: musicTitle,
+        artist: musicArtist,
+        url: musicUrl || undefined
+      };
       
-      // Append music file if selected
-      if (selectedMusic) {
-        const fileName = selectedMusic.name || 'music.mp3';
-        const fileExtension = fileName.split('.').pop() || 'mp3';
-        
-        // For web, we need to handle the blob URL differently
-        if (Platform.OS === 'web' && selectedMusic.uri.startsWith('blob:')) {
-          // For web blob URLs, we'll need to fetch the blob and append it
-          const response = await fetch(selectedMusic.uri);
-          const blob = await response.blob();
-          const file = new File([blob], fileName, { type: blob.type });
-          formData.append('music', file);
-        } else {
-          // For mobile or direct file URLs
-          formData.append('music', {
-            uri: selectedMusic.uri,
-            type: `audio/${fileExtension}`,
-            name: fileName,
-          } as any);
-        }
-      }
+      const result = await apiService.addMusic(musicData);
       
-      // Use direct fetch for file upload since our API service doesn't handle FormData well
-      const token = apiService.getToken();
-      const response = await fetch('http://192.168.18.93:5000/api/music', {
-        method: 'POST',
-        headers: {
-          'x-access-token': token || '',
-        },
-        body: formData,
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
+      if (result.success) {
         Alert.alert('Sucesso', 'Música adicionada com sucesso!');
         
         // Clear form
@@ -322,7 +257,7 @@ export default function AdminScreen() {
         setMusicUrl('');
         setSelectedMusic(null);
       } else {
-        Alert.alert('Erro', result.message || 'Falha ao adicionar a música.');
+        Alert.alert('Erro', result.error || 'Falha ao adicionar a música.');
       }
     } catch (error) {
       console.error('Error adding music:', error);
@@ -567,7 +502,10 @@ export default function AdminScreen() {
               onPress={selectVideoThumbnail}
             >
               {videoThumbnail ? (
-                <Image source={{ uri: videoThumbnail }} style={styles.thumbnail} />
+                <Image 
+                  source={{ uri: typeof videoThumbnail === 'object' ? videoThumbnail.uri : videoThumbnail }} 
+                  style={styles.thumbnail} 
+                />
               ) : (
                 <Text style={[styles.thumbnailText, { color: isDark ? '#ccc' : '#666' }]}>
                   Toque para selecionar uma imagem

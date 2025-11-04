@@ -1,9 +1,6 @@
-import { getCurrentUser, loginUser as loginUserService, logout as logoutService, registerUser as registerUserService } from '@/utils/db/database';
+import { apiService } from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-
-// Import the API service to check for stored tokens
-import { apiService } from '@/services/api';
 
 interface User {
   id: number;
@@ -11,6 +8,7 @@ interface User {
   name: string;
   profile_image: string | null;
   created_at: string;
+  is_admin?: boolean;
 }
 
 interface AuthContextType {
@@ -35,10 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // First check if there's a stored token
         const token = await apiService.getStoredToken();
         if (token) {
-          // If there's a token, try to get the current user
-          const currentUser = getCurrentUser();
-          if (currentUser) {
-            setUser(currentUser);
+          // If there's a token, try to get the current user profile
+          const result = await apiService.getProfile();
+          if (result.success) {
+            setUser(result.user);
           }
         }
       } catch (error) {
@@ -52,11 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const userData = await loginUserService(email, password);
-      if (userData) {
-        setUser(userData);
+      const result = await apiService.login(email, password);
+      if (result.success) {
+        setUser(result.user);
       } else {
-        throw new Error('Invalid credentials');
+        throw new Error(result.error || 'Invalid credentials');
       }
     } catch (error) {
       // Error is already logged in the service, just rethrow
@@ -66,10 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (name: string, email: string, password: string) => {
     try {
-      await registerUserService(email, password, name);
-      // After registration, login the user
-      const userData = await loginUserService(email, password);
-      setUser(userData);
+      const result = await apiService.register(email, password, name);
+      if (result.success) {
+        setUser(result.user);
+      } else {
+        throw new Error(result.error || 'Registration failed');
+      }
     } catch (error) {
       // Error is already logged in the service, just rethrow
       throw error;
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await logoutService();
+      await apiService.logout();
       setUser(null);
       
       // Remove biometric credentials on logout
@@ -91,9 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
+      const result = await apiService.getProfile();
+      if (result.success) {
+        setUser(result.user);
       }
     } catch (error) {
       console.log('Error refreshing user:', error);

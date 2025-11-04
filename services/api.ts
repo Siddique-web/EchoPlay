@@ -1,3 +1,7 @@
+// Import AsyncStorage
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+
 // Simple in-memory storage for demo purposes
 const users: any[] = [
   {
@@ -19,12 +23,12 @@ const musics: any[] = [];
 // Simple in-memory token storage for demo purposes
 let currentToken: string | null = null;
 
-// For development, use the machine's IP address to work with Expo Go
-// In production, this should be the actual server address
-const API_BASE_URL = 'http://192.168.18.93:5000/api'; // Updated to use the correct IP
-
-// Import AsyncStorage
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// API URL - Fixed to avoid double /api prefix
+const API_BASE_URL = Constants.expoConfig?.extra?.API_URL || 
+  process.env.API_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://echoplay-apii.onrender.com' 
+    : 'http://192.168.18.93:5000');
 
 // Store token in memory and AsyncStorage
 const storeToken = async (token: string) => {
@@ -60,6 +64,49 @@ const removeToken = async () => {
     await AsyncStorage.removeItem('userToken');
   } catch (error) {
     console.error('Error removing token:', error);
+  }
+};
+
+// Generic API request function with better error handling
+const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const token = await getStoredToken();
+  
+  // Set default headers
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...((options.headers as Record<string, string>) || {})
+  };
+  
+  // Set default options
+  const config: RequestInit = {
+    ...options,
+    headers
+  };
+  
+  console.log(`Attempting to ${options.method || 'GET'} ${url}`);
+  
+  try {
+    const response = await fetch(url, config);
+    
+    // Handle network errors
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API request failed with status ${response.status}: ${errorText}`);
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+    
+    // Handle empty responses
+    const text = await response.text();
+    if (!text) {
+      return {};
+    }
+    
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('Network error:', error);
+    throw error;
   }
 };
 
@@ -150,7 +197,7 @@ const fallbackUploadProfileImage = async (imageUri: string) => {
   return { success: false, error: 'User not found' };
 };
 
-// Add five sample videos for demonstration
+// Add sample videos for demonstration
 const addSampleVideos = () => {
   // Check if we already have videos to avoid duplicates
   if (videos.length > 0) return;
@@ -253,135 +300,66 @@ const addSampleMusic = () => {
 addSampleVideos();
 addSampleMusic();
 
-// API service functions
+// API service functions with improved error handling
 export const apiService = {
-  // Get token (exported for file upload)
-  getToken: (): string | null => {
-    return getToken();
-  },
-  
-  // Get stored token (for initial load)
-  getStoredToken: async (): Promise<string | null> => {
-    return getStoredToken();
-  },
-  
-  // Login user
+  // Login with improved error handling
   login: async (email: string, password: string) => {
     try {
       console.log('Attempting to login with:', email);
-      
-      // First, try to connect to the Python API
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const response = await apiRequest('/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        signal: controller.signal
+        body: JSON.stringify({ email, password })
       });
       
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      console.log('Login response:', response.status, data);
-      
-      if (response.ok) {
-        // Store token
-        await storeToken(data.token);
-        return { success: true, user: data.user, token: data.token };
+      if (response.success) {
+        await storeToken(response.token);
+        return { success: true, user: response.user, token: response.token };
       } else {
-        // If API returns an error, fallback to local authentication
-        console.log('API login failed, falling back to local authentication');
-        return await fallbackLogin(email, password);
+        return { success: false, error: response.error || 'Login failed' };
       }
     } catch (error) {
-      // If network error, fallback to local authentication
       console.log('Network error, falling back to local authentication');
+      // Fallback to local authentication
       return await fallbackLogin(email, password);
     }
   },
-
-  // Register user
+  
+  // Register with improved error handling
   register: async (email: string, password: string, name?: string) => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/register`, {
+      const response = await apiRequest('/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name }),
-        signal: controller.signal
+        body: JSON.stringify({ email, password, name })
       });
       
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Store token
-        await storeToken(data.token);
-        return { success: true, user: data.user, token: data.token };
+      if (response.success) {
+        await storeToken(response.token);
+        return { success: true, user: response.user, token: response.token };
       } else {
-        // If API returns an error, fallback to local registration
-        console.log('API registration failed, falling back to local registration');
-        return await fallbackRegister(email, password, name);
+        return { success: false, error: response.error || 'Registration failed' };
       }
     } catch (error) {
-      // If network error, fallback to local registration
       console.log('Network error, falling back to local registration');
+      // Fallback to local registration
       return await fallbackRegister(email, password, name);
     }
   },
-
-  // Get user profile
+  
+  // Get user profile with improved error handling
   getProfile: async () => {
     try {
-      const token = getToken();
-      if (!token) {
-        return { success: false, error: 'No token found' };
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/user/profile`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        signal: controller.signal
+      const response = await apiRequest('/user/profile', {
+        method: 'GET'
       });
       
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        return { success: true, user: data };
+      if (response.success) {
+        return { success: true, user: response.user };
       } else {
-        // If token is invalid, remove it
-        if (data.message === 'Token is invalid!') {
-          await removeToken();
-        }
-        // Fallback to local user data
-        console.log('API profile retrieval failed, falling back to local data');
-        const email = token.replace('mock-jwt-token-for-', '');
-        const user = users.find(u => u.email === email);
-        if (user) {
-          return { success: true, user };
-        }
-        return { success: false, error: data.message };
+        return { success: false, error: response.error || 'Failed to get profile' };
       }
     } catch (error) {
-      // Fallback to local user data
-      console.log('Network error, falling back to local data');
+      console.log('Network error getting profile, using local data');
+      // Return local user data if available
       const token = getToken();
       if (token) {
         const email = token.replace('mock-jwt-token-for-', '');
@@ -390,51 +368,26 @@ export const apiService = {
           return { success: true, user };
         }
       }
-      return { success: false, error: 'Network error' };
+      return { success: false, error: 'Failed to get profile' };
     }
   },
-
-  // Update user profile
+  
+  // Update user profile with improved error handling
   updateProfile: async (updates: any) => {
     try {
-      const token = getToken();
-      if (!token) {
-        return { success: false, error: 'No token found' };
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/user/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        body: JSON.stringify(updates),
-        signal: controller.signal
+      const response = await apiRequest('/user/profile', {
+        method: 'POST',
+        body: JSON.stringify(updates)
       });
       
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        return { success: true, user: data };
+      if (response.success) {
+        return { success: true, user: response.user };
       } else {
-        // Fallback to local update
-        console.log('API profile update failed, falling back to local update');
-        const email = token.replace('mock-jwt-token-for-', '');
-        const userIndex = users.findIndex(u => u.email === email);
-        if (userIndex !== -1) {
-          users[userIndex] = { ...users[userIndex], ...updates };
-          return { success: true, user: users[userIndex] };
-        }
-        return { success: false, error: data.message };
+        return { success: false, error: response.error || 'Failed to update profile' };
       }
     } catch (error) {
-      // Fallback to local update
-      console.log('Network error, falling back to local update');
+      console.log('Network error updating profile, using local data');
+      // Update local user data
       const token = getToken();
       if (token) {
         const email = token.replace('mock-jwt-token-for-', '');
@@ -444,478 +397,132 @@ export const apiService = {
           return { success: true, user: users[userIndex] };
         }
       }
-      return { success: false, error: 'Network error' };
+      return { success: false, error: 'Failed to update profile' };
     }
   },
-
-  // Upload profile image
+  
+  // Upload profile image with improved error handling
   uploadProfileImage: async (imageUri: string) => {
     try {
-      const token = getToken();
-      if (!token) {
-        return { success: false, error: 'No token found' };
-      }
-
-      // For web platform with blob URLs
-      if (typeof window !== 'undefined' && (imageUri.startsWith('blob:') || imageUri.startsWith('http://localhost:8081'))) {
-        // Handle web blob URLs or Expo development server URLs
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        
-        // Convert blob to base64
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for image upload
-        
-        const apiResponse = await fetch(`${API_BASE_URL}/user/profile-image`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-access-token': token,
-          },
-          body: JSON.stringify({ image: base64 }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await apiResponse.json();
-        
-        if (apiResponse.ok) {
-          return { success: true, profile_image: data.profile_image };
-        } else {
-          // Fallback to local image storage
-          console.log('API image upload failed, falling back to local storage');
-          return await fallbackUploadProfileImage(imageUri);
-        }
+      const response = await apiRequest('/user/profile-image', {
+        method: 'POST',
+        body: JSON.stringify({ imageUri })
+      });
+      
+      if (response.success) {
+        return { success: true, profile_image: response.profile_image };
       } else {
-        // For mobile platforms or file URLs
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for image upload
-        
-        const apiResponse = await fetch(`${API_BASE_URL}/user/profile-image`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-access-token': token,
-          },
-          body: JSON.stringify({ image: base64 }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await apiResponse.json();
-        
-        if (apiResponse.ok) {
-          return { success: true, profile_image: data.profile_image };
-        } else {
-          // Fallback to local image storage
-          console.log('API image upload failed, falling back to local storage');
-          return await fallbackUploadProfileImage(imageUri);
-        }
+        return { success: false, error: response.error || 'Failed to upload profile image' };
       }
     } catch (error) {
-      // Fallback to local image storage
-      console.log('Network error, falling back to local image storage');
+      console.log('Network error uploading profile image, using local data');
+      // Fallback to local profile image storage
       return await fallbackUploadProfileImage(imageUri);
     }
   },
-
-  // Add video (admin only)
-  addVideo: async (videoData: { title: string; description?: string; url: string; thumbnail?: string }) => {
-    try {
-      const token = getToken();
-      if (!token) {
-        return { success: false, error: 'No token found' };
-      }
-
-      // For file uploads, we need to handle FormData properly
-      if (videoData.url.startsWith('blob:') || videoData.url.startsWith('file:')) {
-        // This is a local file, handle it differently
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const response = await fetch(`${API_BASE_URL}/videos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-access-token': token,
-          },
-          body: JSON.stringify(videoData),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          // Add to local storage as well for immediate feedback
-          const newVideo = {
-            ...data.video,
-            created_at: new Date().toISOString()
-          };
-          videos.push(newVideo);
-          return { success: true, video: newVideo };
-        } else {
-          return { success: false, error: data.message };
-        }
-      } else {
-        // This is a URL, handle it normally
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const response = await fetch(`${API_BASE_URL}/videos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-access-token': token,
-          },
-          body: JSON.stringify(videoData),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          // Add to local storage as well for immediate feedback
-          const newVideo = {
-            ...data.video,
-            created_at: new Date().toISOString()
-          };
-          videos.push(newVideo);
-          return { success: true, video: newVideo };
-        } else {
-          return { success: false, error: data.message };
-        }
-      }
-    } catch (error) {
-      console.log('Network error adding video, using fallback');
-      // Create a fallback video object
-      const fallbackVideo = {
-        id: videos.length + 1,
-        title: videoData.title,
-        description: videoData.description || '',
-        url: videoData.url,
-        thumbnail: videoData.thumbnail || null,
-        created_at: new Date().toISOString()
-      };
-      videos.push(fallbackVideo);
-      return { success: true, video: fallbackVideo };
-    }
-  },
-
-  // Get all videos - return in order of most recent first
+  
+  // Get videos with improved error handling
   getVideos: async () => {
     try {
-      const token = getToken();
-      if (!token) {
-        // Return sample data sorted by most recent first
-        const sortedVideos = [...videos].sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        return { success: true, videos: sortedVideos };
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/videos`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        signal: controller.signal
+      const response = await apiRequest('/videos', {
+        method: 'GET'
       });
       
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Sort videos by most recent first
-        const sortedVideos = Array.isArray(data) ? data : data.videos || [];
-        sortedVideos.sort((a: any, b: any) => 
-          new Date(b.created_at || b.id).getTime() - new Date(a.created_at || a.id).getTime()
-        );
-        return { success: true, videos: sortedVideos };
+      if (response.success) {
+        return { success: true, videos: response.videos || [] };
       } else {
-        // Fallback to sample data
-        console.log('API video retrieval failed, falling back to sample data');
-        const sortedVideos = [...videos].sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        return { success: true, videos: sortedVideos };
+        console.log('Network error getting videos, falling back to sample data');
+        return { success: false, error: response.error || 'Failed to get videos', videos: videos };
       }
     } catch (error) {
       console.log('Network error getting videos, falling back to sample data');
-      // Fallback to sample data
-      const sortedVideos = [...videos].sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      return { success: true, videos: sortedVideos };
+      // Return sample videos if network fails
+      return { success: false, error: 'Network error', videos: videos };
     }
   },
-
-  // Add music (admin only)
-  addMusic: async (musicData: { title: string; artist: string; url: string }) => {
-    try {
-      const token = getToken();
-      if (!token) {
-        return { success: false, error: 'No token found' };
-      }
-
-      // For file uploads, we need to handle FormData properly
-      if (musicData.url.startsWith('blob:') || musicData.url.startsWith('file:')) {
-        // This is a local file, handle it differently
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const response = await fetch(`${API_BASE_URL}/music`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-access-token': token,
-          },
-          body: JSON.stringify(musicData),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          // Add to local storage as well for immediate feedback
-          const newMusic = {
-            ...data.music,
-            created_at: new Date().toISOString()
-          };
-          musics.push(newMusic);
-          return { success: true, music: newMusic };
-        } else {
-          return { success: false, error: data.message };
-        }
-      } else {
-        // This is a URL, handle it normally
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const response = await fetch(`${API_BASE_URL}/music`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-access-token': token,
-          },
-          body: JSON.stringify(musicData),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-          // Add to local storage as well for immediate feedback
-          const newMusic = {
-            ...data.music,
-            created_at: new Date().toISOString()
-          };
-          musics.push(newMusic);
-          return { success: true, music: newMusic };
-        } else {
-          return { success: false, error: data.message };
-        }
-      }
-    } catch (error) {
-      console.log('Network error adding music, using fallback');
-      // Create a fallback music object
-      const fallbackMusic = {
-        id: musics.length + 1,
-        title: musicData.title,
-        artist: musicData.artist,
-        url: musicData.url,
-        created_at: new Date().toISOString()
-      };
-      musics.push(fallbackMusic);
-      return { success: true, music: fallbackMusic };
-    }
-  },
-
-  // Get all music - return in order of most recent first
+  
+  // Get music with improved error handling
   getMusic: async () => {
     try {
-      const token = getToken();
-      if (!token) {
-        // Return sample data sorted by most recent first
-        const sortedMusics = [...musics].sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        return { success: true, music: sortedMusics };
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/music`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        signal: controller.signal
+      const response = await apiRequest('/music', {
+        method: 'GET'
       });
       
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Sort music by most recent first
-        const sortedMusics = Array.isArray(data) ? data : data.music || [];
-        sortedMusics.sort((a: any, b: any) => 
-          new Date(b.created_at || b.id).getTime() - new Date(a.created_at || a.id).getTime()
-        );
-        return { success: true, music: sortedMusics };
+      if (response.success) {
+        return { success: true, music: response.music || [] };
       } else {
-        // Fallback to sample data
-        console.log('API music retrieval failed, falling back to sample data');
-        const sortedMusics = [...musics].sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        return { success: true, music: sortedMusics };
+        console.log('Network error getting music, falling back to sample data');
+        return { success: false, error: response.error || 'Failed to get music', music: musics };
       }
     } catch (error) {
       console.log('Network error getting music, falling back to sample data');
-      // Fallback to sample data
-      const sortedMusics = [...musics].sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      return { success: true, music: sortedMusics };
+      // Return sample music if network fails
+      return { success: false, error: 'Network error', music: musics };
     }
   },
-
-  // Delete music (admin only)
-  deleteMusic: async (musicId: number) => {
+  
+  // Add video with improved error handling
+  addVideo: async (videoData: any) => {
     try {
-      const token = getToken();
-      if (!token) {
-        return { success: false, error: 'No token found' };
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/music/${musicId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        signal: controller.signal
+      const response = await apiRequest('/videos', {
+        method: 'POST',
+        body: JSON.stringify(videoData)
       });
       
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        return { success: true };
+      if (response.success) {
+        return { success: true, video: response.video };
       } else {
-        return { success: false, error: data.message };
+        return { success: false, error: response.error || 'Failed to add video' };
       }
     } catch (error) {
-      console.log('Network error deleting music');
-      return { success: false, error: 'Network error' };
+      console.log('Network error adding video');
+      return { success: false, error: 'Network error adding video' };
     }
   },
-
-  // Delete video (admin only)
-  deleteVideo: async (videoId: number) => {
+  
+  // Add music with improved error handling
+  addMusic: async (musicData: any) => {
     try {
-      const token = getToken();
-      if (!token) {
-        return { success: false, error: 'No token found' };
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/videos/${videoId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        signal: controller.signal
+      const response = await apiRequest('/music', {
+        method: 'POST',
+        body: JSON.stringify(musicData)
       });
       
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        return { success: true };
+      if (response.success) {
+        return { success: true, music: response.music };
       } else {
-        return { success: false, error: data.message };
+        return { success: false, error: response.error || 'Failed to add music' };
       }
     } catch (error) {
-      console.log('Network error deleting video');
-      return { success: false, error: 'Network error' };
+      console.log('Network error adding music');
+      return { success: false, error: 'Network error adding music' };
     }
   },
-
-  // Logout user
+  
+  // Logout
   logout: async () => {
-    await removeToken();
-    return { success: true };
-  },
-
-  // Check if user is authenticated
-  isAuthenticated: async () => {
-    const token = getToken();
-    if (!token) return false;
-
-    // Optionally verify token with backend
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/user/profile`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-access-token': token,
-        },
-        signal: controller.signal
+      await apiRequest('/logout', {
+        method: 'POST'
       });
-      
-      clearTimeout(timeoutId);
-      
-      return response.ok;
     } catch (error) {
-      // Fallback to local token validation
-      console.log('Network error, falling back to local token validation');
-      return !!token;
+      console.log('Logout request failed, but proceeding anyway');
     }
+    await removeToken();
   },
+  
+  // Get stored token
+  getStoredToken: async () => {
+    return await getStoredToken();
+  },
+  
+  // Get current token (for direct use)
+  getToken: () => {
+    return getToken();
+  },
+  
+  // Store token
+  storeToken: async (token: string) => {
+    await storeToken(token);
+  }
 };

@@ -10,7 +10,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.echoplay.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +24,12 @@
       "predictiveBackGestureEnabled": false,
       "networkSecurityConfig": {
         "cleartextTrafficPermitted": true
-      }
+      },
+      "package": "com.echoplay.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "static",
@@ -52,16 +58,19 @@
       "reactCompiler": true
     },
     "updates": {
-      "enabled": false,
-      "checkAutomatically": "ON_ERROR_RECOVERY"
+      "enabled": true,
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "url": "https://u.expo.dev/a4f99eb4-b893-4b5b-80ff-853e26b2b9b4"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "extra": {
       "eas": {
-        "projectId": ""
-      }
+        "projectId": "a4f99eb4-b893-4b5b-80ff-853e26b2b9b4"
+      },
+      "API_URL": "https://echoplay-apii.onrender.com",
+      "router": {}
     },
     "platforms": [
       "ios",
@@ -72,8 +81,12 @@
       "allowed": [
         "localhost",
         "127.0.0.1",
-        "192.168.0.0/16"
+        "192.168.0.0/16",
+        "10.0.0.0/8"
       ]
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

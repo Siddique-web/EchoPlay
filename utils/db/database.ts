@@ -1,4 +1,3 @@
-import { apiService } from '../../services/api';
 
 // Simple in-memory storage for web and fallback
 const webStorage: { [key: string]: any[] } = {};
@@ -31,95 +30,6 @@ const initWebDB = async () => {
   return true;
 };
 
-const registerUserWeb = async (email: string, password: string, name?: string): Promise<any> => {
-  console.log('Registering user via API:', email);
-  // Use the Python API for registration
-  const result = await apiService.register(email, password, name);
-  
-  if (result.success) {
-    currentUser = result.user;
-    console.log('Registration successful:', result.user);
-    return { insertId: result.user.id };
-  } else {
-    const errorMessage = (result as any).error || 'Registration failed';
-    console.error('Registration failed:', errorMessage);
-    throw new Error(errorMessage);
-  }
-};
-
-const loginUserWeb = async (email: string, password: string): Promise<any> => {
-  console.log('Logging in user via API:', email);
-  // Use the Python API for login with fallback
-  const result = await apiService.login(email, password);
-  
-  if (result.success) {
-    currentUser = result.user;
-    console.log('Login successful:', result.user);
-    return result.user;
-  } else {
-    const errorMessage = (result as any).error || 'Login failed';
-    console.error('Login failed:', errorMessage);
-    // Instead of throwing an error, return null to indicate failed login
-    return null;
-  }
-};
-
-const getUserProfileWeb = async (userId: number): Promise<any> => {
-  console.log('Getting user profile via API for user:', userId);
-  // Use the Python API to get user profile
-  const result = await apiService.getProfile();
-  
-  if (result.success) {
-    console.log('Profile retrieved:', result.user);
-    return result.user;
-  } else {
-    const errorMessage = (result as any).error || 'Failed to get user profile';
-    console.error('Failed to get user profile:', errorMessage);
-    throw new Error(errorMessage);
-  }
-};
-
-const updateProfileWeb = async (userId: number, updates: any): Promise<any> => {
-  console.log('Updating profile via API for user:', userId, 'with updates:', updates);
-  // Use the Python API to update user profile
-  const result = await apiService.updateProfile(updates);
-  
-  if (result.success) {
-    currentUser = result.user;
-    console.log('Profile updated:', result.user);
-    return result.user;
-  } else {
-    const errorMessage = (result as any).error || 'Failed to update profile';
-    console.error('Failed to update profile:', errorMessage);
-    throw new Error(errorMessage);
-  }
-};
-
-const uploadProfileImageWeb = async (imageUri: string): Promise<any> => {
-  console.log('Uploading profile image via API:', imageUri);
-  // Use the Python API to upload profile image
-  const result = await apiService.uploadProfileImage(imageUri);
-  
-  if (result.success) {
-    console.log('Profile image uploaded:', result.profile_image);
-    // Update current user with new profile image
-    if (currentUser) {
-      currentUser.profile_image = result.profile_image;
-    }
-    return result.profile_image;
-  } else {
-    const errorMessage = (result as any).error || 'Failed to upload profile image';
-    console.error('Failed to upload profile image:', errorMessage);
-    throw new Error(errorMessage);
-  }
-};
-
-const logoutWeb = async (): Promise<void> => {
-  console.log('Logging out user via API');
-  await apiService.logout();
-  currentUser = null;
-};
-
 // Public API - Always use in-memory storage
 export const initDB = async () => {
   if (isInitialized) {
@@ -131,34 +41,41 @@ export const initDB = async () => {
   return initWebDB();
 };
 
+// These functions are now handled by the API service directly
 export const registerUser = async (email: string, password: string, name?: string): Promise<any> => {
-  console.log('Registering user:', email);
-  return registerUserWeb(email, password, name);
+  console.log('Registering user via API service');
+  // This function is now handled by apiService.register directly
+  throw new Error('Use apiService.register directly instead');
 };
 
 export const loginUser = async (email: string, password: string): Promise<any> => {
-  console.log('Logging in user:', email);
-  return loginUserWeb(email, password);
+  console.log('Logging in user via API service');
+  // This function is now handled by apiService.login directly
+  throw new Error('Use apiService.login directly instead');
 };
 
 export const getUserProfile = async (userId: number): Promise<any> => {
-  console.log('Getting user profile for user:', userId);
-  return getUserProfileWeb(userId);
+  console.log('Getting user profile via API service');
+  // This function is now handled by apiService.getProfile directly
+  throw new Error('Use apiService.getProfile directly instead');
 };
 
 export const updateProfile = async (userId: number, updates: any): Promise<any> => {
-  console.log('Updating profile for user:', userId);
-  return updateProfileWeb(userId, updates);
+  console.log('Updating profile via API service');
+  // This function is now handled by apiService.updateProfile directly
+  throw new Error('Use apiService.updateProfile directly instead');
 };
 
 export const uploadProfileImage = async (imageUri: string): Promise<any> => {
-  console.log('Uploading profile image:', imageUri);
-  return uploadProfileImageWeb(imageUri);
+  console.log('Uploading profile image via API service');
+  // This function is now handled by apiService.uploadProfileImage directly
+  throw new Error('Use apiService.uploadProfileImage directly instead');
 };
 
 export const logout = async (): Promise<void> => {
-  console.log('Logging out user');
-  return logoutWeb();
+  console.log('Logging out user via API service');
+  // This function is now handled by apiService.logout directly
+  throw new Error('Use apiService.logout directly instead');
 };
 
 export const getCurrentUser = (): any => {
